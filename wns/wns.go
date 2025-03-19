@@ -1,26 +1,36 @@
 package wns
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/cenkalti/backoff/v3"
 	"github.com/waku-org/waku-go-bindings/waku"
 	"github.com/waku-org/waku-go-bindings/waku/common"
 )
 
-func SetupServerNode() (*waku.WakuNode, error) {
+const requestTimeout = 30 * time.Second
 
-	const requestTimeout = 30 * time.Second
+func SetupWakuNode() (*waku.WakuNode, error) {
+
+	tcpPort, udpPort, err := waku.GetFreePortIfNeeded(0, 0)
+	if err != nil {
+		fmt.Printf("Failed getting free ports: %v\n", err)
+		return nil, err
+	}
+
 	// Configure server node
 	serverNodeWakuConfig := common.WakuConfig{
 		Relay:           true,
 		LogLevel:        "DEBUG",
-		Discv5Discovery: false,
+		Discv5Discovery: true,
+		DnsDiscoveryUrl: "enrtree://AMOJVZX4V6EXP7NTJPMAYJYST2QP6AJXYW76IU6VGJS7UVSNDYZG4@boot.prod.status.nodes.status.im",
 		ClusterID:       16,
 		Shards:          []uint16{64},
-		Discv5UdpPort:   9020,
-		TcpPort:         60020,
+		Discv5UdpPort:   udpPort,
+		TcpPort:         tcpPort,
 	}
 
 	// Create and start server node
@@ -33,6 +43,29 @@ func SetupServerNode() (*waku.WakuNode, error) {
 		fmt.Printf("Failed to start server node: %v\n", err)
 		return nil, err
 	}
+
+	options := func(b *backoff.ExponentialBackOff) {
+		b.MaxElapsedTime = 30 * time.Second
+	}
+
+	// Sanity check, not great, but it's probably helpful
+	err = waku.RetryWithBackOff(func() error {
+		numConnected, err := serverNode.GetNumConnectedPeers()
+		if err != nil {
+			return err
+		}
+		// Wait for it to discover peers
+		if numConnected > 2 {
+			return nil
+		}
+		return errors.New("could not discover enough peers")
+	}, options)
+
+	if err != nil {
+		fmt.Printf("Failed to setup server node: %v\n", err)
+		return nil, err
+	}
+
 	return serverNode, nil
 }
 
