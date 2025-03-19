@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gabrielmer/waku-name-service/wns"
+	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/waku-go-bindings/waku"
 	"google.golang.org/protobuf/proto"
@@ -26,8 +27,14 @@ func main() {
 	}
 	defer wakuNode.Stop()
 
+	serverKeyInfo, err := wns.GenerateKeys()
+	if err != nil {
+		fmt.Printf("Failed generating server keys: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Start server
-	go wns.StartWnsServer(wakuNode)
+	go wns.StartWnsServer(wakuNode, serverKeyInfo)
 
 	testSenderNode, err := wns.SetupWakuNode()
 	if err != nil {
@@ -40,9 +47,16 @@ func main() {
 	message := &pb.WakuMessage{
 		Payload:      []byte("hellooo"),
 		ContentTopic: "test-content-topic",
-		Version:      proto.Uint32(0),
+		Version:      proto.Uint32(1),
 		Timestamp:    proto.Int64(time.Now().UnixNano()),
 	}
+
+	err = payload.EncodeWakuMessage(message, serverKeyInfo)
+	if err != nil {
+		fmt.Printf("Failed to encode message: %v\n", err)
+		os.Exit(1)
+	}
+
 	pubsubTopic := waku.FormatWakuRelayTopic(16, 64)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

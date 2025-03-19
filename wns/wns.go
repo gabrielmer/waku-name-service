@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/waku-go-bindings/waku"
 	"github.com/waku-org/waku-go-bindings/waku/common"
 )
@@ -69,7 +71,7 @@ func SetupWakuNode() (*waku.WakuNode, error) {
 	return serverNode, nil
 }
 
-func StartWnsServer(serverNode *waku.WakuNode) {
+func StartWnsServer(serverNode *waku.WakuNode, keyInfo *payload.KeyInfo) {
 	log.Println("Server started, listening for messages...")
 
 	for {
@@ -84,4 +86,21 @@ func StartWnsServer(serverNode *waku.WakuNode) {
 			}
 		}
 	}
+}
+
+func GenerateKeys() (*payload.KeyInfo, error) {
+	var err error
+	var keyInfo *payload.KeyInfo = new(payload.KeyInfo)
+	keyInfo.PrivKey, err = crypto.GenerateKey()
+
+	if err != nil {
+		fmt.Printf("Failed generating keys: %v\n", err)
+		return nil, err
+	}
+
+	keyInfo.Kind = payload.Asymmetric
+	keyInfo.PubKey = keyInfo.PrivKey.PublicKey
+
+	return keyInfo, nil
+
 }
