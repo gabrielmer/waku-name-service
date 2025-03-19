@@ -2,13 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/gabrielmer/waku-name-service/wns"
+	"github.com/joho/godotenv"
 	"github.com/waku-org/go-waku/waku/v2/payload"
 	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/waku-go-bindings/waku"
@@ -19,6 +23,14 @@ const AppName = "wns-server"
 const AppVersion = "1"
 
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	// Now read environment variables as usual
+	privateKeyHex := os.Getenv("PRIVATE_KEY")
+
 	// Set up wake nodes first
 	wakuNode, err := wns.SetupWakuNode()
 	if err != nil {
@@ -32,6 +44,25 @@ func main() {
 		fmt.Printf("Failed generating server keys: %v\n", err)
 		os.Exit(1)
 	}
+
+	fmt.Println("------- privateKeyHex: ", privateKeyHex)
+	privKey, err := crypto.HexToECDSA(privateKeyHex)
+	if err != nil {
+		fmt.Printf("Failed re-converting hex to private key: %v\n", err)
+		os.Exit(1)
+	}
+
+	pubBytes := crypto.FromECDSAPub(&privKey.PublicKey)
+	pubHex := hex.EncodeToString(pubBytes)
+	fmt.Println("------ hex public key: ", pubHex)
+	pubKey2, err := crypto.UnmarshalPubkey(pubBytes)
+	if err != nil {
+		fmt.Printf("Failed re-converting hex to public key: %v\n", err)
+		os.Exit(1)
+	}
+	pubBytes2 := crypto.FromECDSAPub(pubKey2)
+	pubHex2 := hex.EncodeToString(pubBytes2)
+	fmt.Println("------ hex public key 2: ", pubHex2)
 
 	// Start server
 	go wns.StartWnsServer(wakuNode, serverKeyInfo)

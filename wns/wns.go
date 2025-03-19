@@ -102,5 +102,17 @@ func GenerateKeys() (*payload.KeyInfo, error) {
 	keyInfo.PubKey = keyInfo.PrivKey.PublicKey
 
 	return keyInfo, nil
-
 }
+
+/* func FillKeysFromEnv() (*payload.KeyInfo) {
+	var keyInfo *payload.KeyInfo = new(payload.KeyInfo)
+
+
+
+	keyInfo.PrivKey =
+	keyInfo.Kind = payload.Asymmetric
+	keyInfo.PubKey = keyInfo.PrivKey.PublicKey
+
+	return keyInfo, nil
+
+} */
