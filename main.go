@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -33,8 +34,16 @@ func sendMessage(serverPubKeyHex string) error {
 		fmt.Printf("Failed to parse server's public key: %v\n", err)
 		return errors.New("could not parse server's public key")
 	}
-
 	serverKeyInfo.PubKey = *pubKey
+
+	var senderKeyInfo *payload.KeyInfo = new(payload.KeyInfo)
+	senderKeyInfo, err = wns.GenerateKeys()
+	if err != nil {
+		fmt.Printf("Failed generating sender's public key: %v\n", err)
+		return errors.New("could not parse sender's public key")
+	}
+
+	senderHexPubKey := wns.PubKeyToHex(&senderKeyInfo.PubKey)
 
 	testSenderNode, err := wns.SetupWakuNode()
 	if err != nil {
@@ -43,9 +52,22 @@ func sendMessage(serverPubKeyHex string) error {
 	}
 	defer testSenderNode.Stop()
 
+	req := wns.Request{
+		RequestID: "1234",
+		PublicKey: senderHexPubKey,
+		Service:   "ResolveWallet",
+		Input:     "",
+	}
+
+	jsonBytes, err := json.Marshal(req)
+	if err != nil {
+		fmt.Printf("Failed generating json bytes: %v\n", err)
+		return errors.New("could not generate json bytes")
+	}
+
 	// Send test message
 	message := &pb.WakuMessage{
-		Payload:      []byte("hellooo"),
+		Payload:      []byte(string(jsonBytes)),
 		ContentTopic: wns.PubKeyHexToContentTopic(serverPubKeyHex),
 		Version:      proto.Uint32(1),
 		Timestamp:    proto.Int64(time.Now().UnixNano()),

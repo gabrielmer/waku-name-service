@@ -3,6 +3,7 @@ package wns
 import (
 	"crypto/ecdsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -17,6 +18,13 @@ import (
 )
 
 const requestTimeout = 30 * time.Second
+
+type Request struct {
+	RequestID string `json:"requestId"`
+	PublicKey string `json:"publicKey"`
+	Service   string `json:"service"`
+	Input     string `json:"input"`
+}
 
 func SetupWakuNode() (*waku.WakuNode, error) {
 
@@ -98,6 +106,19 @@ func handleReceivedMessage(envelope common.Envelope, keyInfo *payload.KeyInfo) {
 	fmt.Printf("Received message with payload: %s\n", envelope.Message().Payload)
 	payload.DecodeWakuMessage(envelope.Message(), keyInfo)
 	fmt.Printf("Decoded payload: %s\n", envelope.Message().Payload)
+
+	var req Request
+	err := json.Unmarshal([]byte(envelope.Message().Payload), &req)
+	if err != nil {
+		fmt.Println("Invalid JSON:", err)
+		return
+	}
+
+	fmt.Println("Valid JSON successfully parsed")
+	fmt.Printf("Request ID: %s\n", req.RequestID)
+	fmt.Printf("Public Key: %s\n", req.PublicKey)
+	fmt.Printf("Service: %s\n", req.Service)
+	fmt.Printf("Input: %s\n", req.Input)
 
 }
 
