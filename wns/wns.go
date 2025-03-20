@@ -151,3 +151,15 @@ func HexToPubKey(pubKeyHex string) (*ecdsa.PublicKey, error) {
 
 	return pubKey, nil
 }
+
+func PubKeyHexToContentTopic(pubKeyHex string) string {
+	key := ""
+	if len(pubKeyHex) <= 16 {
+		key = pubKeyHex
+	} else {
+		key = pubKeyHex[:16]
+	}
+
+	contentTopic := fmt.Sprintf("/wns/1/%s/proto", key)
+	return contentTopic
+}

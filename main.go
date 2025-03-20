@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -19,6 +20,51 @@ import (
 
 const AppName = "wns-server"
 const AppVersion = "1"
+
+const ServerPubKeyHex = "04e3cd903bec9535b87077c94b950b69a5d669875070566125f7dd7a586a4eefc137db9d6906fa123b64947433ae104afd9935bedb75ce67dc1238e95a78d29111"
+
+func sendMessage(serverPubKeyHex string) error {
+
+	var serverKeyInfo *payload.KeyInfo = new(payload.KeyInfo)
+	var err error
+	serverKeyInfo.Kind = payload.Asymmetric
+	pubKey, err := wns.HexToPubKey(serverPubKeyHex)
+	if err != nil {
+		fmt.Printf("Failed to parse server's public key: %v\n", err)
+		return errors.New("could not parse server's public key")
+	}
+
+	serverKeyInfo.PubKey = *pubKey
+
+	testSenderNode, err := wns.SetupWakuNode()
+	if err != nil {
+		fmt.Printf("Failed to start test sender node: %v\n", err)
+		return errors.New("could not start test sender node")
+	}
+	defer testSenderNode.Stop()
+
+	// Send test message
+	message := &pb.WakuMessage{
+		Payload:      []byte("hellooo"),
+		ContentTopic: wns.PubKeyHexToContentTopic(serverPubKeyHex),
+		Version:      proto.Uint32(1),
+		Timestamp:    proto.Int64(time.Now().UnixNano()),
+	}
+
+	err = payload.EncodeWakuMessage(message, serverKeyInfo)
+	if err != nil {
+		fmt.Printf("Failed to encode message: %v\n", err)
+		return errors.New("could not encode message")
+	}
+
+	pubsubTopic := waku.FormatWakuRelayTopic(16, 64)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	testSenderNode.RelayPublish(ctx, message, pubsubTopic)
+
+	return nil
+
+}
 
 func main() {
 	err := godotenv.Load(".env")
@@ -43,31 +89,14 @@ func main() {
 	// Start server
 	go wns.StartWnsServer(wakuNode, serverKeyInfo)
 
-	testSenderNode, err := wns.SetupWakuNode()
+	err = sendMessage(ServerPubKeyHex)
 	if err != nil {
-		fmt.Printf("Failed to start test sender node: %v\n", err)
-		os.Exit(1)
-	}
-	defer testSenderNode.Stop()
-
-	// Send test message
-	message := &pb.WakuMessage{
-		Payload:      []byte("hellooo"),
-		ContentTopic: "test-content-topic",
-		Version:      proto.Uint32(1),
-		Timestamp:    proto.Int64(time.Now().UnixNano()),
-	}
-
-	err = payload.EncodeWakuMessage(message, serverKeyInfo)
-	if err != nil {
-		fmt.Printf("Failed to encode message: %v\n", err)
+		fmt.Printf("Failed sending message: %v\n", err)
 		os.Exit(1)
 	}
 
-	pubsubTopic := waku.FormatWakuRelayTopic(16, 64)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	testSenderNode.RelayPublish(ctx, message, pubsubTopic)
+	/* serverPubKeyHex := wns.PubKeyToHex(&serverKeyInfo.PubKey)
+	fmt.Println("-------------- serverPubKeyHex: ", serverPubKeyHex) */
 
 	// Set up signal handling after initializing everything
 	fmt.Println("Server running. Press Ctrl+C to shutdown gracefully...")
