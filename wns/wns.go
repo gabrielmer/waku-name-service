@@ -1,9 +1,12 @@
 package wns
 
 import (
+	"crypto/ecdsa"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/cenkalti/backoff/v3"
@@ -104,15 +107,47 @@ func GenerateKeys() (*payload.KeyInfo, error) {
 	return keyInfo, nil
 }
 
-/* func FillKeysFromEnv() (*payload.KeyInfo) {
+func FillKeysFromEnv() (*payload.KeyInfo, error) {
+
+	var err error
+	privateKeyHex := os.Getenv("PRIVATE_KEY")
+	if privateKeyHex == "" {
+		return nil, errors.New("PRIVATE_KEY env variable is empty")
+	}
+
 	var keyInfo *payload.KeyInfo = new(payload.KeyInfo)
 
+	keyInfo.PrivKey, err = crypto.HexToECDSA(privateKeyHex)
+	if err != nil {
+		fmt.Printf("Failed converting hex to private key: %v\n", err)
+		os.Exit(1)
+	}
 
-
-	keyInfo.PrivKey =
 	keyInfo.Kind = payload.Asymmetric
 	keyInfo.PubKey = keyInfo.PrivKey.PublicKey
 
 	return keyInfo, nil
 
-} */
+}
+
+func PubKeyToHex(pubKey *ecdsa.PublicKey) string {
+	pubKeyBytes := crypto.FromECDSAPub(pubKey)
+	pubKeyHex := hex.EncodeToString(pubKeyBytes)
+	return pubKeyHex
+}
+
+func HexToPubKey(pubKeyHex string) (*ecdsa.PublicKey, error) {
+
+	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
+	if err != nil {
+		fmt.Printf("Failed converting hex to public key: %v\n", err)
+		return nil, err
+	}
+	pubKey, err := crypto.UnmarshalPubkey(pubKeyBytes)
+	if err != nil {
+		fmt.Printf("Failed re-converting hex to public key: %v\n", err)
+		os.Exit(1)
+	}
+
+	return pubKey, nil
+}
