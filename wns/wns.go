@@ -77,18 +77,28 @@ func SetupWakuNode() (*waku.WakuNode, error) {
 func StartWnsServer(serverNode *waku.WakuNode, keyInfo *payload.KeyInfo) {
 	log.Println("Server started, listening for messages...")
 
+	pubKeyHex := PubKeyToHex(&keyInfo.PubKey)
+	contentTopic := PubKeyHexToContentTopic(pubKeyHex)
+
 	for {
 		select {
 		case envelope := <-serverNode.MsgChan:
 			if envelope != nil {
 				// Print the payload
-				fmt.Printf("Received message with payload: %s\n", envelope.Message().Payload)
 				fmt.Printf("Content topic: %s\n", envelope.Message().ContentTopic)
-
-				// You can add more processing here if needed
+				if envelope.Message().ContentTopic == contentTopic {
+					handleReceivedMessage(envelope, keyInfo)
+				}
 			}
 		}
 	}
+}
+
+func handleReceivedMessage(envelope common.Envelope, keyInfo *payload.KeyInfo) {
+	fmt.Printf("Received message with payload: %s\n", envelope.Message().Payload)
+	payload.DecodeWakuMessage(envelope.Message(), keyInfo)
+	fmt.Printf("Decoded payload: %s\n", envelope.Message().Payload)
+
 }
 
 func GenerateKeys() (*payload.KeyInfo, error) {
