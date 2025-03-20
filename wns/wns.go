@@ -147,9 +147,16 @@ func handleReceivedMessage(serverNode *waku.WakuNode, envelope common.Envelope, 
 }
 
 func handleResolveWallet(serverNode *waku.WakuNode, req Request, senderKeyInfo *payload.KeyInfo) {
+
+	ethAddress, err := GenerateEthereumAddress()
+	if err != nil {
+		fmt.Printf("Failed generating ethereum address: %v\n", err)
+		return
+	}
+
 	res := Response{
 		RequestID: req.RequestID,
-		Output:    "my address",
+		Output:    ethAddress,
 		Status:    "200",
 		Message:   "OK",
 	}
@@ -195,6 +202,19 @@ func GenerateKeys() (*payload.KeyInfo, error) {
 	keyInfo.PubKey = keyInfo.PrivKey.PublicKey
 
 	return keyInfo, nil
+}
+
+func GenerateEthereumAddress() (string, error) {
+
+	keyInfo, err := GenerateKeys()
+	if err != nil {
+		return "", err
+	}
+
+	address := crypto.PubkeyToAddress(keyInfo.PubKey)
+	fmt.Println("Ethereum Address:", address.Hex())
+
+	return address.Hex(), nil
 }
 
 func FillKeysFromEnv() (*payload.KeyInfo, error) {
