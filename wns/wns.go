@@ -1,6 +1,7 @@
 package wns
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
@@ -13,8 +14,10 @@ import (
 	"github.com/cenkalti/backoff/v3"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/waku-org/go-waku/waku/v2/payload"
+	"github.com/waku-org/go-waku/waku/v2/protocol/pb"
 	"github.com/waku-org/waku-go-bindings/waku"
 	"github.com/waku-org/waku-go-bindings/waku/common"
+	"google.golang.org/protobuf/proto"
 )
 
 const requestTimeout = 30 * time.Second
@@ -24,6 +27,13 @@ type Request struct {
 	PublicKey string `json:"publicKey"`
 	Service   string `json:"service"`
 	Input     string `json:"input"`
+}
+
+type Response struct {
+	RequestID string `json:"requestId"`
+	Output    string `json:"output"`
+	Status    string `json:"service"`
+	Message   string `json:"message"`
 }
 
 func SetupWakuNode() (*waku.WakuNode, error) {
@@ -95,14 +105,14 @@ func StartWnsServer(serverNode *waku.WakuNode, keyInfo *payload.KeyInfo) {
 				// Print the payload
 				fmt.Printf("Content topic: %s\n", envelope.Message().ContentTopic)
 				if envelope.Message().ContentTopic == contentTopic {
-					handleReceivedMessage(envelope, keyInfo)
+					handleReceivedMessage(serverNode, envelope, keyInfo)
 				}
 			}
 		}
 	}
 }
 
-func handleReceivedMessage(envelope common.Envelope, keyInfo *payload.KeyInfo) {
+func handleReceivedMessage(serverNode *waku.WakuNode, envelope common.Envelope, keyInfo *payload.KeyInfo) {
 	fmt.Printf("Received message with payload: %s\n", envelope.Message().Payload)
 	payload.DecodeWakuMessage(envelope.Message(), keyInfo)
 	fmt.Printf("Decoded payload: %s\n", envelope.Message().Payload)
@@ -114,11 +124,60 @@ func handleReceivedMessage(envelope common.Envelope, keyInfo *payload.KeyInfo) {
 		return
 	}
 
-	fmt.Println("Valid JSON successfully parsed")
+	fmt.Println("Received request")
 	fmt.Printf("Request ID: %s\n", req.RequestID)
 	fmt.Printf("Public Key: %s\n", req.PublicKey)
 	fmt.Printf("Service: %s\n", req.Service)
 	fmt.Printf("Input: %s\n", req.Input)
+
+	var senderKeyInfo *payload.KeyInfo = new(payload.KeyInfo)
+
+	senderKeyInfo.Kind = payload.Asymmetric
+	pubKey, err := HexToPubKey(req.PublicKey)
+	if err != nil {
+		fmt.Printf("Failed to parse sender's public key: %v\n", err)
+		return
+	}
+	senderKeyInfo.PubKey = *pubKey
+
+	if req.Service == "ResolveWallet" {
+		handleResolveWallet(serverNode, req, senderKeyInfo)
+	}
+
+}
+
+func handleResolveWallet(serverNode *waku.WakuNode, req Request, senderKeyInfo *payload.KeyInfo) {
+	res := Response{
+		RequestID: req.RequestID,
+		Output:    "my address",
+		Status:    "200",
+		Message:   "OK",
+	}
+
+	jsonBytes, err := json.Marshal(res)
+	if err != nil {
+		fmt.Printf("Failed generating json bytes: %v\n", err)
+		return
+	}
+
+	// Send test message
+	message := &pb.WakuMessage{
+		Payload:      []byte(string(jsonBytes)),
+		ContentTopic: PubKeyHexToContentTopic(req.PublicKey),
+		Version:      proto.Uint32(1),
+		Timestamp:    proto.Int64(time.Now().UnixNano()),
+	}
+
+	err = payload.EncodeWakuMessage(message, senderKeyInfo)
+	if err != nil {
+		fmt.Printf("Failed to encode message: %v\n", err)
+	}
+
+	pubsubTopic := waku.FormatWakuRelayTopic(16, 64)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	fmt.Println("--------- sending response!")
+	serverNode.RelayPublish(ctx, message, pubsubTopic)
 
 }
 
