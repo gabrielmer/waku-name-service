@@ -113,9 +113,11 @@ func StartWnsServer(serverNode *waku.WakuNode, keyInfo *payload.KeyInfo) {
 }
 
 func handleReceivedMessage(serverNode *waku.WakuNode, envelope common.Envelope, keyInfo *payload.KeyInfo) {
-	fmt.Printf("Received message with payload: %v\n", envelope.Message().Payload)
-	payload.DecodeWakuMessage(envelope.Message(), keyInfo)
-	fmt.Printf("Decoded payload: %s\n", envelope.Message().Payload)
+	fmt.Printf("Received message with payload: %s\n", envelope.Message().Payload)
+
+	// ------ COMMENTED FOR DEMO ------
+	/* payload.DecodeWakuMessage(envelope.Message(), keyInfo)
+	fmt.Printf("Decoded payload: %s\n", envelope.Message().Payload) */
 
 	var req Request
 	err := json.Unmarshal([]byte(envelope.Message().Payload), &req)
@@ -178,17 +180,20 @@ func handleResolveWallet(serverNode *waku.WakuNode, req Request, senderKeyInfo *
 		Timestamp:    proto.Int64(time.Now().UnixNano()),
 	}
 
-	err = payload.EncodeWakuMessage(message, senderKeyInfo)
+	// ------ COMMENTED FOR DEMO ------
+	/* err = payload.EncodeWakuMessage(message, senderKeyInfo)
 	if err != nil {
 		fmt.Printf("Failed to encode message: %v\n", err)
-	}
+	} */
 
 	// fmt.Println("----------- encoded bytes: ", message.Payload)
 
 	pubsubTopic := waku.FormatWakuRelayTopic(16, 64)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	fmt.Println("------------ pubKeyHex: ", req.PublicKey)
 	fmt.Println("--------- sending response!")
+	fmt.Println("--------- Response content topic ", PubKeyHexToContentTopic(req.PublicKey))
 	serverNode.RelayPublish(ctx, message, pubsubTopic)
 
 }
