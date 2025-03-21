@@ -73,11 +73,16 @@ func sendMessage(serverPubKeyHex string) error {
 		Timestamp:    proto.Int64(time.Now().UnixNano()),
 	}
 
+	fmt.Println("--------------- string(jsonBytes): ", string(jsonBytes))
+	fmt.Println("--------------- []byte(string(jsonBytes)): ", []byte(string(jsonBytes)))
+	message.Payload = []byte(string("hello"))
+	fmt.Println("message.Payload: ", message.Payload)
 	err = payload.EncodeWakuMessage(message, serverKeyInfo)
 	if err != nil {
 		fmt.Printf("Failed to encode message: %v\n", err)
 		return errors.New("could not encode message")
 	}
+	fmt.Println("----------- encrypted bytes: ", message.Payload)
 
 	pubsubTopic := waku.FormatWakuRelayTopic(16, 64)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

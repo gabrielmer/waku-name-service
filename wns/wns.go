@@ -113,7 +113,7 @@ func StartWnsServer(serverNode *waku.WakuNode, keyInfo *payload.KeyInfo) {
 }
 
 func handleReceivedMessage(serverNode *waku.WakuNode, envelope common.Envelope, keyInfo *payload.KeyInfo) {
-	fmt.Printf("Received message with payload: %s\n", envelope.Message().Payload)
+	fmt.Printf("Received message with payload: %v\n", envelope.Message().Payload)
 	payload.DecodeWakuMessage(envelope.Message(), keyInfo)
 	fmt.Printf("Decoded payload: %s\n", envelope.Message().Payload)
 
@@ -167,6 +167,9 @@ func handleResolveWallet(serverNode *waku.WakuNode, req Request, senderKeyInfo *
 		return
 	}
 
+	// fmt.Println("--------------- string(jsonBytes): ", string(jsonBytes))
+	//fmt.Println("--------------- []byte(string(jsonBytes)): ", []byte(string(jsonBytes)))
+
 	// Send test message
 	message := &pb.WakuMessage{
 		Payload:      []byte(string(jsonBytes)),
@@ -179,6 +182,8 @@ func handleResolveWallet(serverNode *waku.WakuNode, req Request, senderKeyInfo *
 	if err != nil {
 		fmt.Printf("Failed to encode message: %v\n", err)
 	}
+
+	// fmt.Println("----------- encoded bytes: ", message.Payload)
 
 	pubsubTopic := waku.FormatWakuRelayTopic(16, 64)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
